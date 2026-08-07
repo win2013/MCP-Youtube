@@ -1,11 +1,19 @@
 """YouTube API client for retrieving video information"""
+"""Edwin A. Hernandez, PhD """
 
+import argparse
+import asyncio
+import json
+import importlib
 import os
 import re
-import httpx
 from typing import Dict, List, Optional
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+
+try:
+    from googleapiclient.discovery import build  # type: ignore
+    from googleapiclient.errors import HttpError  # type: ignore
+except ImportError as e:
+    raise ImportError("Install google-api-python-client") from e
 
 
 class YouTubeClient:
@@ -23,7 +31,6 @@ class YouTubeClient:
             raise ValueError("YouTube API key is required. Set YOUTUBE_API_KEY environment variable.")
         
         self.youtube = build("youtube", "v3", developerKey=self.api_key)
-        self.http_client = httpx.AsyncClient()
     
     def extract_video_id(self, url: str) -> Optional[str]:
         """Extract YouTube video ID from URL
@@ -142,8 +149,8 @@ class YouTubeClient:
             request = self.youtube.search().list(
                 part="snippet",
                 type="video",
-                relatedToVideoId=video_id,
-                maxResults=max_results
+                related_to_video_id=video_id,
+                max_results=max_results
             )
             
             response = request.execute()
@@ -201,4 +208,54 @@ class YouTubeClient:
     
     async def close(self):
         """Close HTTP client"""
-        await self.http_client.aclose()
+        # No persistent async HTTP client is used by googleapiclient; nothing to close.
+        return None
+
+
+async def _run_client(args: argparse.Namespace) -> None:
+    client = YouTubeClient(api_key=args.api_key)
+    try:
+        if args.command == "details":
+            video_id = client.extract_video_id(args.video) or args.video
+            result = await client.get_video_details(video_id)
+        elif args.command == "transcript":
+            video_id = client.extract_video_id(args.video) or args.video
+            result = await client.get_transcript(video_id)
+        elif args.command == "similar":
+            video_id = client.extract_video_id(args.video) or args.video
+            result = await client.get_similar_videos(video_id, max_results=args.max_results)
+        elif args.command == "search":
+            result = await client.search_videos(args.query, max_results=args.max_results)
+        else:
+            raise ValueError(f"Unknown command: {args.command}")
+
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    finally:
+        await client.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run YouTubeClient from the command line")
+    parser.add_argument("--api-key", help="YouTube Data API key")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    details = subparsers.add_parser("details", help="Get details for a video")
+    details.add_argument("video", help="YouTube video URL or ID")
+
+    transcript = subparsers.add_parser("transcript", help="Get transcript for a video")
+    transcript.add_argument("video", help="YouTube video URL or ID")
+
+    similar = subparsers.add_parser("similar", help="Get similar videos")
+    similar.add_argument("video", help="YouTube video URL or ID")
+    similar.add_argument("--max-results", type=int, default=5, help="Number of similar videos to return")
+
+    search = subparsers.add_parser("search", help="Search YouTube videos")
+    search.add_argument("query", help="Search query")
+    search.add_argument("--max-results", type=int, default=10, help="Maximum number of results")
+
+    args = parser.parse_args()
+    asyncio.run(_run_client(args))
+
+
+if __name__ == "__main__":
+    main()

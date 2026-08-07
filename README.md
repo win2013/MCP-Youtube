@@ -1,6 +1,7 @@
 # MCP-Youtube
+(c)2026 - Dr. Edwin A. Hernadnez
 
-A Modern Context Protocol (MCP) server for YouTube that retrieves and processes video content.
+A Modern Context Protocol (MCP) server for YouTube that retrieves and processes video content.a
 
 ## Features
 
