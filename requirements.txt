@@ -1,0 +1,7 @@
+# MCP-Youtube requirements
+python-dotenv>=1.0.0
+httpx>=0.24.0
+google-api-python-client>=2.100.0
+youtube-transcript-api>=0.6.1
+langchain>=0.1.0
+langchain-openai>=0.0.2
