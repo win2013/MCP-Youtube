@@ -1,6 +1,7 @@
 # MCP-Youtube
-(c)2026 - Dr. Edwin A. Hernadnez
-
+# (c)2026 - Dr. Edwin A. Hernandez
+# MEVIA Project
+#
 A Modern Context Protocol (MCP) server for YouTube that retrieves and processes video content.a
 
 ## Features
