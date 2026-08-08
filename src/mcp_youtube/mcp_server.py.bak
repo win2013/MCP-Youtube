@@ -6,8 +6,6 @@ import asyncio
 import os
 import secrets
 import logging
-import subprocess
-import sys
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -136,56 +134,6 @@ def run_stdio_transport():
     mcp.run(transport="stdio")
 
 
-def run_all_transports(host: str = "0.0.0.0", port: int = MCP_PORT):
-    """Run MCP server with all transports (streamable-http, SSE, and STDIO)."""
-    logger.info(f"Starting all transports on {host}:{port}")
-    logger.info(f"Token key: {TOKEN_KEY}")
-
-    env = os.environ.copy()
-    env["MCP_PORT"] = str(port)
-
-    commands = [
-        (
-            "streamable-http",
-            [sys.executable, __file__, "--transport", "tcp", "--host", host, "--port", str(port)],
-        ),
-        (
-            "sse",
-            [sys.executable, __file__, "--transport", "sse", "--host", host, "--port", str(port)],
-        ),
-        (
-            "stdio",
-            [sys.executable, __file__, "--transport", "stdio"],
-        ),
-    ]
-
-    processes = []
-    try:
-        for transport_name, command in commands:
-            logger.info(f"Starting {transport_name} transport")
-            process = subprocess.Popen(
-                command,
-                env=env,
-                stdin=sys.stdin,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-            )
-            processes.append((transport_name, process))
-
-        for transport_name, process in processes:
-            process.wait()
-    except KeyboardInterrupt:
-        logger.info("Shutting down all transports")
-    finally:
-        for transport_name, process in processes:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-
-
 if __name__ == "__main__":
     import argparse
     
@@ -211,7 +159,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.transport == "tcp":
-        run_http_transport(args.host, args.port)
+        run_tcp_transport(args.host, args.port)
     elif args.transport == "stdio":
         run_stdio_transport()
     elif args.transport == "sse":
