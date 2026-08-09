@@ -1,0 +1,19 @@
+{
+  "serverName": "nu5vkp0km3",
+  "request": {
+    "url": "http://192.168.1.121:9090/mcp",
+    "method": "POST",
+    "headers": {
+      "accept": "application/json, text/event-stream",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "string",
+      "size": 189,
+      "value": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{}},\"id\":1}"
+    },
+    "jsonRpcMethods": [
+      "initialize"
+    ]
+  }
+}

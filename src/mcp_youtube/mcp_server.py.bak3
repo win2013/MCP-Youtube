@@ -147,7 +147,7 @@ def run_all_transports(host: str = "0.0.0.0", port: int = MCP_PORT):
     commands = [
         (
             "streamable-http",
-            [sys.executable, __file__, "--transport", "tcp", "--host", host, "--port", str(port)],
+            [sys.executable, __file__, "--transport", "http", "--host", host, "--port", str(port)],
         ),
         (
             "sse",
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run YouTube MCP Server")
     parser.add_argument(
         "--transport",
-        choices=["tcp", "stdio", "sse", "all"],
+        choices=["http", "stdio", "sse", "all"],
         default="all",
         help="Transport method to use"
     )
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    if args.transport == "tcp":
+    if args.transport == "http":
         run_http_transport(args.host, args.port)
     elif args.transport == "stdio":
         run_stdio_transport()

@@ -46,6 +46,8 @@ class YouTubeClient:
             r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
             r'youtu\.be\/([0-9A-Za-z_-]{11})',
             r'embed\/([0-9A-Za-z_-]{11})',
+            r'\/shorts\/([0-9A-Za-z_-]{11})',
+            r'(?:live=|\/live\/)([0-9A-Za-z_-]{11})',
         ]
         
         for pattern in patterns:
@@ -228,7 +230,7 @@ async def _run_client(args: argparse.Namespace) -> None:
             result = await client.search_videos(args.query, max_results=args.max_results)
         else:
             raise ValueError(f"Unknown command: {args.command}")
-
+      
         print(json.dumps(result, indent=2, ensure_ascii=False))
     finally:
         await client.close()

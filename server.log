@@ -1,0 +1,45 @@
+Patched _check_accept_headers to accept json, event-stream, or both
+Patched _check_accept_headers to accept json, event-stream, or both
+[08/08/26 15:40:22] INFO     Starting HTTP transport on             <string>:375
+                             0.0.0.0:9091                                       
+                    INFO     Token key:                             <string>:376
+                             UATaj9c8Gj7CpLgjbWKKe4pcb6lr2RwPYF9ML7             
+                             nN2kU                                              
+                    INFO     JSON response mode: False              <string>:377
+                    INFO     Adding EnvelopeMiddleware as ASGI      <string>:386
+                             middleware                                         
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│                                                                              │
+│                         ▄▀▀ ▄▀█ █▀▀ ▀█▀ █▀▄▀█ █▀▀ █▀█                        │
+│                         █▀  █▀█ ▄▄█  █  █ ▀ █ █▄▄ █▀▀                        │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                FastMCP 3.4.6                                 │
+│                            https://gofastmcp.com                             │
+│                                                                              │
+│                  🖥  Server:      YouTube MCP Server, 0.1.0                   │
+│                  🚀 Deploy free: https://horizon.prefect.io                  │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+                    INFO     Starting MCP server 'YouTube MCP   transport.py:361
+                             Server' with transport                             
+                             'streamable-http' on                               
+                             http://0.0.0.0:9091/mcp                            
+INFO:     Started server process [61496]
+INFO:     Waiting for application startup.
+                    INFO     EnvelopeMiddleware called, scope type: <string>:147
+                             lifespan                                           
+INFO:mcp.server.streamable_http_manager:StreamableHTTP session manager started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9091 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:mcp.server.streamable_http_manager:StreamableHTTP session manager shutting down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [61496]

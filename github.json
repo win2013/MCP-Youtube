@@ -1,0 +1,19 @@
+{
+  "serverName": "czfh1vv37br",
+  "request": {
+    "url": "http://192.168.1.11:8085/mcp",
+    "method": "POST",
+    "headers": {
+      "accept": "application/json, text/event-stream",
+      "authorization": "Bearer: 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",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "string",
+      "size": 189
+    },
+    "jsonRpcMethods": [
+      "initialize"
+    ]
+  }
+}
