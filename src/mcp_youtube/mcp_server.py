@@ -168,93 +168,14 @@ class EnvelopeMiddleware:
     def __init__(self, app):
         self.app = app
     
-    async def __call__(self, scope, receive, send):
-        """Intercept requests and handle envelope format."""
-        import json
-        
-        logger.info(f"EnvelopeMiddleware called, scope type: {scope.get('type')}")
-        
-        if scope["type"] == "http":
-            # Read the request body once
-            body_bytes = b""
-            more_body = True
-            
-            while more_body:
-                message = await receive()
-                body_bytes += message.get("body", b"")
-                more_body = message.get("more_body", False)
-            
-            logger.info(f"Received body bytes: {body_bytes[:200]}")
-            
-            # Determine the final body (either extracted or original)
-            final_body_bytes = body_bytes
-            
-            try:
-                body = json.loads(body_bytes.decode("utf-8"))
-                
-                logger.info(f"Parsed JSON body: {body}")
-                
-                # Check if this is an envelope format
-                extracted = handle_envelope_envelope(body, body_bytes)
-                
-                if extracted is not None:
-                    logger.info(f"Extracted JSON-RPC from Llama.cpp envelope")
-                    logger.info(f"Extracted JSON-RPC: {extracted}")
-                    
-                    # Use the extracted JSON-RPC as the body
-                    final_body_bytes = json.dumps(extracted).encode("utf-8")
-                    logger.info(f"Final body bytes (extracted): {final_body_bytes}")
-                else:
-                    logger.info("No envelope format detected, using original body")
-            except json.JSONDecodeError as e:
-                # Not valid JSON, use original body
-                logger.warning(f"Failed to parse JSON: {e}")
-            
-            # Update Content-Length header to match final body size
-            # Remove existing Content-Length and Transfer-Encoding headers
-            new_headers = [
-                (k, v) for k, v in scope["headers"]
-                if k.lower() not in [b"content-length", b"transfer-encoding"]
-            ]
-            new_headers.append((b"content-length", str(len(final_body_bytes)).encode()))
-            scope["headers"] = new_headers
-            
-            # Always create a new receive function with the final body
-            async def new_receive():
-                return {
-                    "type": "http.request",
-                    "body": final_body_bytes,
-                    "more_body": False
-                }
-            
-            # Create a wrapper for send to handle the response
-            original_send = send
-            
-            async def wrapped_send(message):
-                if message["type"] == "http.response.start":
-                    logger.info(f"Response start: status={message.get('status')}")
-                elif message["type"] == "http.response.body":
-                    logger.info(f"Response body: body={message.get('body', b'')[:200]}")
-                
-                await original_send(message)
-            
-            # Call the original app with the new receive and send
-            try:
-                await self.app(scope, new_receive, wrapped_send)
-            except Exception as e:
-                logger.error(f"Error in middleware: {e}", exc_info=True)
-                # Send error response if something goes wrong
-                await wrapped_send({
-                    "type": "http.response.start",
-                    "status": 500,
-                    "headers": [[b"content-type", b"application/json"]],
-                })
-                await wrapped_send({
-                    "type": "http.response.body",
-                    "body": b'{"error": "Internal server error"}',
-                })
-        else:
-            await self.app(scope, receive, send)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):        
+        if scope["type"] == "http":            
+            # Get client IP address            
+            client_ip = scope.get("client", ("unknown",))[0]            
+            method = scope.get("method", "UNKNOWN")            
+            path = scope.get("path", "/")                        
+            logger.info(f"Request from IP: {client_ip} | Method: {method} | Path: {path}")                
+        await self.app(scope, receive, send) 
 
 # Store YouTube client for reuse
 _youtube_client: Optional[YouTubeClient] = None
@@ -270,72 +191,6 @@ def get_youtube_client() -> YouTubeClient:
         _youtube_client = YouTubeClient(api_key=api_key)
     return _youtube_client
 
-
-def handle_llama_cpp_envelope(request_body: dict) -> dict | None:
-    """
-    Handle Llama.cpp 2026 envelope format and extract the actual JSON-RPC request.
-    
-    Llama.cpp sends a wrapper format:
-    {
-      "serverName": "...",
-      "request": {
-        "url": "...",
-        "method": "POST",
-        "headers": {...},
-        "body": {
-          "kind": "string",
-          "size": 189,
-          "value": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",...}"
-        }
-      }
-    }
-    
-    Returns the extracted JSON-RPC body dict, or None if not envelope format.
-    """
-    if not isinstance(request_body, dict):
-        return None
-    
-    # Check if this is the Llama.cpp envelope format
-    if "serverName" in request_body and "request" in request_body:
-        request_obj = request_body.get("request", {})
-        body_obj = request_obj.get("body", {})
-        logger.info(f"handle_llama_cpp_envelope: Checking envelope format, body: {body_obj}")        
-        # Check if body contains the actual JSON-RPC as a string
-        if body_obj.get("kind") == "string" and "value" in body_obj:
-            try:
-                import json
-                actual_request = json.loads(body_obj["value"])
-                logger.info(f"Extracted JSON-RPC from Llama.cpp envelope: {actual_request}")
-                return actual_request
-            except (json.JSONDecodeError, TypeError):
-                logger.warning(f"Failed to parse extracted JSON-RPC: {body_obj['value']}")
-                return None
-        
-    return None
-
-
-def extract_jsonrpc_from_request(request_body: dict) -> dict:
-    """
-    Extract the actual JSON-RPC request from various formats.
-    Handles both standard JSON-RPC and Llama.cpp envelope format.
-    
-    Supports MCP protocol versions 2024, 2025, and 2026.
-    """
-    # First check if it's already a standard JSON-RPC request
-    
-    if isinstance(request_body, dict):
-        if "jsonrpc" in request_body and request_body["jsonrpc"] == "2.0":
-            if "method" in request_body and "id" in request_body:
-                return request_body
-           
-      
-    # Try to extract from Llama.cpp envelope format
-    # extracted = handle_llama_cpp_envelope(request_body)
-    # if extracted is not None:
-    #    return extracted
-    
-    # Return original if no transformation needed
-    return request_body
 
 
 @mcp.tool()
