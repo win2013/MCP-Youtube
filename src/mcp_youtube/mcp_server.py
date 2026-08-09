@@ -10,6 +10,9 @@ import subprocess
 import sys
 from typing import Optional, Any
 from dotenv import load_dotenv
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
+import uvicorn
 
 # Import ASGI types
 try:
@@ -59,6 +62,7 @@ if hasattr(streamable_http_module, 'StreamableHTTPServerTransport'):
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import get_logger
 from starlette.responses import JSONResponse
+from starlette.middleware.cors import CORSMiddleware
 from typing import Any
 
 from mcp_youtube.youtube_client import YouTubeClient
@@ -73,11 +77,34 @@ _mcp_app: Any = None
 # Create FastMCP server
 mcp = FastMCP(
     name="YouTube MCP Server",
-    version="0.1.0",
+    version="0.2.0",
     instructions="A Model Context Protocol server for YouTube that retrieves and processes video content."
 )
 
+# Add CORS middleware to allow cross-origin requests
+# This enables the MCP server to accept requests from any origin
+# Configure CORS with required MCP headers
+cors_middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=["*"],                    # or list the exact origin of your llama WebUI
+        allow_credentials=True,                 # often needed
+        allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "mcp-protocol-version",
+            "mcp-session-id",
+            "X-Requested-With",
+            "*"                                 # some clients send extra headers
+        ],
+        expose_headers=["mcp-session-id"],
+        max_age=86400,
+    )
+]
 
+# Pass middleware to the http_app
+app = mcp.http_app(middleware=cors_middleware)
 
 
 # Token for authentication
@@ -86,183 +113,6 @@ MCP_PORT = int(os.environ.get("MCP_PORT", 9090))
 
 
 
-
-# Custom middleware to handle envelope format before fastmcp processes
-class EnvelopeMiddleware:
-    """Middleware to handle Llama.cpp envelope format before fastmcp processing."""
-    
-    def __init__(self, app):
-        self.app = app
-    
-    async def __call__(self, scope: Scope, receive: Receive, send: Send):
-        """Intercept requests and handle envelope format."""
-        import json
-        import secrets
-        
-        logger.info(f"EnvelopeMiddleware called, scope type: {scope.get('type')}")
-        
-        if scope["type"] == "http":
-            method = scope.get("method", "UNKNOWN")
-            
-            # Get client IP address
-            client_ip = scope.get("client", ("unknown",))[0]
-            path = scope.get("path", "/")
-            logger.info(f"Request from IP: {client_ip} | Method: {method} | Path: {path}")
-            
-            # Handle CORS preflight OPTIONS requests
-            if method == "OPTIONS":
-                logger.info("Handling CORS preflight OPTIONS request")
-                # Return 204 No Content for OPTIONS requests (CORS preflight)
-                headers = [
-                    (b"access-control-allow-origin", b"*"),
-                    (b"access-control-allow-methods", b"GET, POST, DELETE, OPTIONS"),
-                    (b"access-control-allow-headers", b"Accept, Content-Type, Authorization, x-api-key, x-exa-source, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID"),
-                    (b"access-control-expose-headers", b"Mcp-Session-Id"),
-                    (b"access-control-max-age", b"86400"),
-                    (b"strict-transport-security", b"max-age=63072000"),
-                    (b"vary", b"Origin"),
-                    (b"cf-cache-status", b"DYNAMIC"),
-                ]
-                await send({
-                    "type": "http.response.start",
-                    "status": 204,
-                    "headers": headers,
-                })
-                await send({
-                    "type": "http.response.body",
-                    "body": b"",
-                })
-                return
-            
-            # For non-OPTIONS requests, read the request body
-            body_bytes = b""
-            more_body = True
-            first_message = True
-            max_iterations = 10  # Safety limit to prevent infinite loops
-            iteration = 0
-            
-            # Get expected Content-Length
-            content_length = 0
-            for k, v in scope.get("headers", []):
-                if k.lower() == b"content-length":
-                    try:
-                        content_length = int(v)
-                    except (ValueError, TypeError):
-                        pass
-                    break
-            
-            while more_body and iteration < max_iterations:
-                iteration += 1
-                try:
-                    # Use asyncio.wait_for to prevent hanging on receive()
-                    message = await asyncio.wait_for(receive(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    logger.warning("Timeout waiting for request body, proceeding with available data")
-                    break
-                
-                body_bytes += message.get("body", b"")
-                more_body = message.get("more_body", False)
-                
-                # Check if we've received all data according to Content-Length
-                if content_length > 0 and len(body_bytes) >= content_length:
-                    logger.info(f"Received expected Content-Length ({content_length} bytes), breaking early")
-                    more_body = False
-                
-                # For POST requests, we should receive the body in the first message
-                # If we get an empty body on the first message with no Content-Length, there might be no body
-                if first_message and not body_bytes and content_length == 0:
-                    more_body = False
-                
-                first_message = False
-            
-            if iteration >= max_iterations:
-                logger.warning(f"Reached max iterations ({max_iterations}) reading request body")
-            
-            # Log body info
-            if body_bytes:
-                logger.info(f"Received {len(body_bytes)} bytes, Content-Length was: {content_length}")
-            else:
-                logger.info("Received empty body, Content-Length was: {content_length}")
-            
-            logger.info(f"Received body bytes: {body_bytes[:200]}")
-            
-            # Generate Mcp-Session-Id for regular requests
-            session_id = generate_session_id()
-            
-            try:
-                body = json.loads(body_bytes.decode("utf-8"))
-                
-                logger.info(f"Parsed JSON body: {body}")
-                
-                # Check if this is an envelope format
-                extracted = handle_envelope_envelope(body, body_bytes)
-                
-                if extracted is not None:
-                    logger.info(f"Extracted JSON-RPC from Llama.cpp envelope")
-                    logger.info(f"Extracted JSON-RPC: {extracted}")
-                    
-                    # Use the extracted JSON-RPC as the body
-                    final_body_bytes = json.dumps(extracted).encode("utf-8")
-                    logger.info(f"Final body bytes (extracted): {final_body_bytes}")
-                else:
-                    logger.info("No envelope format detected, using original body")
-                    final_body_bytes = body_bytes
-            except json.JSONDecodeError as e:
-                # Not valid JSON, use original body
-                logger.warning(f"Failed to parse JSON: {e}")
-                final_body_bytes = body_bytes
-            
-            # Update Content-Length header to match final body size
-            # Remove existing Content-Length and Transfer-Encoding headers
-            new_headers = [
-                (k, v) for k, v in scope["headers"]
-                if k.lower() not in [b"content-length", b"transfer-encoding"]
-            ]
-            new_headers.append((b"content-length", str(len(final_body_bytes)).encode()))
-            scope["headers"] = new_headers
-            
-            # Create a new receive function with the final body
-            async def new_receive():
-                return {
-                    "type": "http.request",
-                    "body": final_body_bytes,
-                    "more_body": False
-                }
-            
-            # Create a wrapper for send to add session ID header to responses
-            original_send = send
-            session_added = [False]  # Use list to allow mutation in nested function
-            
-            async def wrapped_send(message):
-                if message["type"] == "http.response.start" and not session_added[0]:
-                    # Add Mcp-Session-Id header to the response (only once)
-                    headers = list(message.get("headers", []))
-                    headers.append((b"mcp-session-id", session_id.encode()))
-                    message = {**message, "headers": headers}
-                    session_added[0] = True
-                
-                await original_send(message)
-            
-            logger.info(f"Calling app with modified scope and receive")
-            # Call the original app with the new receive and send
-            try:
-                await self.app(scope, new_receive, wrapped_send)
-                logger.info(f"App completed successfully")
-            except Exception as e:
-                logger.error(f"Error in middleware: {e}", exc_info=True)
-                # Send error response if something goes wrong
-                # Note: If session was already added, this won't add another one
-                await wrapped_send({
-                    "type": "http.response.start",
-                    "status": 500,
-                    "headers": [[b"content-type", b"application/json"]],
-                })
-                await wrapped_send({
-                    "type": "http.response.body",
-                    "body": b'{"error": "Internal server error"}',
-                })
-        else:
-            await self.app(scope, receive, send) 
 
 # Store YouTube client for reuse
 _youtube_client: Optional[YouTubeClient] = None
@@ -360,26 +210,22 @@ def run_http_transport(host: str = "0.0.0.0", port: int = MCP_PORT, json_respons
     logger.info(f"Token key: {TOKEN_KEY}")
     logger.info(f"JSON response mode: {json_response}")
     
-    # FastMCP's add_middleware adds to the MCP message middleware chain,
-    # not the ASGI/HTTP middleware chain. We need to pass ASGI middleware directly
-    # to the HTTP app.
+    # FastMCP's streamable-http transport handles CORS and request processing internally
+    # No custom middleware needed - FastMCP handles it automatically
     
-    # Create an ASGI-compatible wrapper for our EnvelopeMiddleware
-    # FastMCP's run_http_async accepts middleware parameter for ASGI middleware
-    
-    logger.info("Adding EnvelopeMiddleware as ASGI middleware")
-    
-    # Import Starlette's Middleware class to wrap our ASGI middleware
-    from starlette.middleware import Middleware
-    
-    # Run the server with streamable-http transport and pass the middleware
-    # Wrap our middleware in Starlette's Middleware class
-    mcp.run(
-        transport="streamable-http", 
-        host=host, 
+   # mcp.run(
+   #     transport="streamable-http", 
+   #     host=host, 
+   #     port=port,
+   #     json_response=json_response,
+   # )
+
+    uvicorn.run(
+        app,
+        host=host,
         port=port,
-        json_response=json_response,
-        middleware=[Middleware(EnvelopeMiddleware)]  # Wrap in Starlette's Middleware
+        # log_level="info",          # optional
+        # reload=True,               # optional for development
     )
 
 

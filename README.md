@@ -32,11 +32,13 @@ cd MCP-Youtube
 pip install -r requirements.txt
 ```
 
-3. Create a `.env` file with your YouTube API key:
+3. Create a `.env_yt` file with your YouTube API key:
 ```
 YOUTUBE_API_KEY=your_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here  # For translation and summarization
 ```
+
+**Note:** The `.env_yt` file is already listed in `.gitignore` to protect your API keys. Do NOT commit your `.env_yt` file to version control.
 
 ## Usage
 
@@ -90,7 +92,7 @@ pytest tests/
 
 3. Run the server:
 ```bash
-python -m mcp_youtube
+YOUTUBE_API_KEY=#####. python3 -m mcp_youtube.mcp_server --transport http --port 9091
 ```
 
 ## License
