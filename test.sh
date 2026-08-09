@@ -1,4 +1,4 @@
-curl -v http://192.168.1.121:9091/mcp \
+curl -m 5  -X POST -v http://192.168.1.125:9091/mcp \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer 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" \
   -H "Accept: application/json, text/event-stream" \

@@ -1,13 +1,13 @@
 Patched _check_accept_headers to accept json, event-stream, or both
 <frozen runpy>:128: RuntimeWarning: 'mcp_youtube.mcp_server' found in sys.modules after import of package 'mcp_youtube', but prior to execution of 'mcp_youtube.mcp_server'; this may result in unpredictable behaviour
 Patched _check_accept_headers to accept json, event-stream, or both
-[08/08/26 22:51:32] INFO     Starting HTTP transport on        mcp_server.py:434
-                             0.0.0.0:9091                                       
-                    INFO     Token key:                        mcp_server.py:435
-                             L-fHeH1Iy7KrJ9GFbOplHVPhVPRwS56zj                  
-                             3ILa7Oy7uo                                         
-                    INFO     JSON response mode: False         mcp_server.py:436
-                    INFO     Adding EnvelopeMiddleware as ASGI mcp_server.py:445
+[08/08/26 22:58:39] INFO     Starting HTTP transport on        mcp_server.py:435
+                             0.0.0.0:9092                                       
+                    INFO     Token key:                        mcp_server.py:436
+                             rseCs_LG5wnpzSluWKO8pNojLUNf31vOP                  
+                             der0whwDgM                                         
+                    INFO     JSON response mode: False         mcp_server.py:437
+                    INFO     Adding EnvelopeMiddleware as ASGI mcp_server.py:446
                              middleware                                         
 
 
@@ -31,15 +31,15 @@ Patched _check_accept_headers to accept json, event-stream, or both
                     INFO     Starting MCP server 'YouTube MCP   transport.py:361
                              Server' with transport                             
                              'streamable-http' on                               
-                             http://0.0.0.0:9091/mcp                            
-INFO:     Started server process [1145]
+                             http://0.0.0.0:9092/mcp                            
+INFO:     Started server process [1774]
 INFO:     Waiting for application startup.
                     INFO     EnvelopeMiddleware called, scope  mcp_server.py:190
                              type: lifespan                                     
 INFO:mcp.server.streamable_http_manager:StreamableHTTP session manager started
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:9091 (Press CTRL+C to quit)
-[08/08/26 22:51:33] INFO     EnvelopeMiddleware called, scope  mcp_server.py:190
+INFO:     Uvicorn running on http://0.0.0.0:9092 (Press CTRL+C to quit)
+[08/08/26 23:09:09] INFO     EnvelopeMiddleware called, scope  mcp_server.py:190
                              type: http                                         
                     INFO     Request from IP: 192.168.1.125 |  mcp_server.py:198
                              Method: POST | Path: /mcp                          
@@ -72,5 +72,5 @@ INFO:     Uvicorn running on http://0.0.0.0:9091 (Press CTRL+C to quit)
                              "capabilities": {}, "clientInfo":                  
                              {"name": "curl-test", "version":                   
                              "1.0"}}}'                                          
-INFO:mcp.server.streamable_http_manager:Created new transport with session ID: 7b575eceac1c4682b9f5f1de1cde59a6
-INFO:     192.168.1.125:59275 - "POST /mcp HTTP/1.1" 200 OK
+INFO:mcp.server.streamable_http_manager:Created new transport with session ID: ec21bb5d93fe480da14c4200ce466967
+INFO:     192.168.1.125:60031 - "POST /mcp HTTP/1.1" 200 OK

@@ -1,0 +1,41 @@
+Patched _check_accept_headers to accept json, event-stream, or both
+<frozen runpy>:128: RuntimeWarning: 'mcp_youtube.mcp_server' found in sys.modules after import of package 'mcp_youtube', but prior to execution of 'mcp_youtube.mcp_server'; this may result in unpredictable behaviour
+Patched _check_accept_headers to accept json, event-stream, or both
+[08/08/26 23:10:07] INFO     Starting HTTP transport on        mcp_server.py:437
+                             0.0.0.0:9095                                       
+                    INFO     Token key:                        mcp_server.py:438
+                             OjK9A7FlGex6P6NUhGxva2ZF_HINwjTVl                  
+                             CARvVLrbZM                                         
+                    INFO     JSON response mode: False         mcp_server.py:439
+                    INFO     Adding EnvelopeMiddleware as ASGI mcp_server.py:448
+                             middleware                                         
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│                                                                              │
+│                         ▄▀▀ ▄▀█ █▀▀ ▀█▀ █▀▄▀█ █▀▀ █▀█                        │
+│                         █▀  █▀█ ▄▄█  █  █ ▀ █ █▄▄ █▀▀                        │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                FastMCP 3.4.6                                 │
+│                            https://gofastmcp.com                             │
+│                                                                              │
+│                  🖥  Server:      YouTube MCP Server, 0.1.0                   │
+│                  🚀 Deploy free: https://horizon.prefect.io                  │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+                    INFO     Starting MCP server 'YouTube MCP   transport.py:361
+                             Server' with transport                             
+                             'streamable-http' on                               
+                             http://0.0.0.0:9095/mcp                            
+INFO:     Started server process [2540]
+INFO:     Waiting for application startup.
+                    INFO     EnvelopeMiddleware called, scope  mcp_server.py:190
+                             type: lifespan                                     
+INFO:mcp.server.streamable_http_manager:StreamableHTTP session manager started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9095 (Press CTRL+C to quit)

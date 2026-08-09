@@ -8,10 +8,24 @@ import secrets
 import logging
 import subprocess
 import sys
-from typing import Optional
+from typing import Optional, Any
 from dotenv import load_dotenv
 
+# Import ASGI types
+try:
+    from starlette.types import Scope, Receive, Send
+except ImportError:
+    # Fallback for older starlette versions
+    Scope = Any
+    Receive = Any
+    Send = Any
+
 load_dotenv('.env_yt')
+
+# Function to generate session ID
+def generate_session_id() -> str:
+    """Generate a unique session ID for MCP connections"""
+    return secrets.token_urlsafe(16)
 
 # Patch the _check_accept_headers function to accept application/json, text/event-stream or both BEFORE importing anything else
 import mcp.server.streamable_http as streamable_http_module
@@ -64,44 +78,6 @@ mcp = FastMCP(
 )
 
 
-# Removed @mcp.custom_route handler - the middleware will handle envelope extraction
-# FastMCP will now process the extracted JSON-RPC directly
-
-
-def handle_envelope_request(request: dict) -> dict | None:
-    """
-    Handle Llama.cpp envelope format and return the extracted JSON-RPC request.
-    
-    If the request is already in JSON-RPC format, returns it as-is.
-    If the request is in envelope format, extracts and returns the JSON-RPC.
-    Otherwise, returns None.
-    """
-    # First check if it's already JSON-RPC format
-    if isinstance(request, dict):
-        if "jsonrpc" in request and "method" in request:
-            return request
-    
-    # Check if this is the Llama.cpp envelope format
-    if isinstance(request, dict):
-        if "serverName" in request and "request" in request:
-            request_obj = request.get("request", {})
-            body_obj = request_obj.get("body", {})
-            logger.info(f"Checking envelope format, body: {body_obj}")
-            # Check if body contains the actual JSON-RPC as a string
-            if body_obj.get("kind") == "string" and "value" in body_obj:
-                try:
-                    import json
-                    return json.loads(body_obj["value"])
-                except (json.JSONDecodeError, TypeError):
-                    return None
-            
-            # Check if body has direct JSON-RPC structure
-            if "value" not in body_obj and isinstance(body_obj, dict):
-                # Maybe the envelope structure is different - check for JSON-RPC fields
-                if "jsonrpc" in body_obj and "method" in body_obj:
-                    return body_obj
-    
-    return None
 
 
 # Token for authentication
@@ -109,56 +85,6 @@ TOKEN_KEY = os.environ.get("MCP_TOKEN_KEY") or secrets.token_urlsafe(32)
 MCP_PORT = int(os.environ.get("MCP_PORT", 9090))
 
 
-def handle_envelope_envelope(body: dict, http_body_bytes: bytes | None = None) -> dict | None:
-    """
-    Handle Llama.cpp envelope format and extract the actual JSON-RPC request.
-    
-    Returns the extracted JSON-RPC dict if envelope format detected, None otherwise.
-    
-    Args:
-        body: The parsed JSON body of the envelope request
-        http_body_bytes: Raw HTTP request body bytes (used when kind="string" but value is missing)
-    """
-    if not isinstance(body, dict):
-        return None
-    
-    # First check if the body itself is already a JSON-RPC request
-    if "jsonrpc" in body and "method" in body:
-        return body
-    
-    # Check if this is the Llama.cpp envelope format
-    if "serverName" in body and "request" in body:
-        request_obj = body.get("request", {})
-        body_obj = request_obj.get("body", {})
-        logger.info(f" handle_envelop: Checking envelope format, body: {request_obj}")
-
-        # Check if body contains the actual JSON-RPC as a string in 'value' field
-        if isinstance(body_obj, dict):
-            if body_obj.get("kind") == "string" and "value" in body_obj:
-                try:
-                    import json
-                    actual_request = json.loads(body_obj["value"])
-                    return actual_request
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            
-            # Check if body is already JSON-RPC format
-            if isinstance(body_obj, dict) and "jsonrpc" in body_obj and "method" in body_obj:
-                return body_obj
-            
-            # Handle case where kind="string" but value is missing
-            # The JSON-RPC might be in the HTTP request body directly
-            if body_obj.get("kind") == "string" and "value" not in body_obj and http_body_bytes:
-                try:
-                    import json
-                    actual_request = json.loads(http_body_bytes.decode("utf-8"))
-                    if "jsonrpc" in actual_request and "method" in actual_request:
-                        logger.info(f"Extracted JSON-RPC from HTTP body (kind=string, no value)")
-                        return actual_request
-                except (json.JSONDecodeError, TypeError):
-                    pass
-    
-    return None
 
 
 # Custom middleware to handle envelope format before fastmcp processes
@@ -168,14 +94,175 @@ class EnvelopeMiddleware:
     def __init__(self, app):
         self.app = app
     
-    async def __call__(self, scope: Scope, receive: Receive, send: Send):        
-        if scope["type"] == "http":            
-            # Get client IP address            
-            client_ip = scope.get("client", ("unknown",))[0]            
-            method = scope.get("method", "UNKNOWN")            
-            path = scope.get("path", "/")                        
-            logger.info(f"Request from IP: {client_ip} | Method: {method} | Path: {path}")                
-        await self.app(scope, receive, send) 
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        """Intercept requests and handle envelope format."""
+        import json
+        import secrets
+        
+        logger.info(f"EnvelopeMiddleware called, scope type: {scope.get('type')}")
+        
+        if scope["type"] == "http":
+            method = scope.get("method", "UNKNOWN")
+            
+            # Get client IP address
+            client_ip = scope.get("client", ("unknown",))[0]
+            path = scope.get("path", "/")
+            logger.info(f"Request from IP: {client_ip} | Method: {method} | Path: {path}")
+            
+            # Handle CORS preflight OPTIONS requests
+            if method == "OPTIONS":
+                logger.info("Handling CORS preflight OPTIONS request")
+                # Return 204 No Content for OPTIONS requests (CORS preflight)
+                headers = [
+                    (b"access-control-allow-origin", b"*"),
+                    (b"access-control-allow-methods", b"GET, POST, DELETE, OPTIONS"),
+                    (b"access-control-allow-headers", b"Accept, Content-Type, Authorization, x-api-key, x-exa-source, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID"),
+                    (b"access-control-expose-headers", b"Mcp-Session-Id"),
+                    (b"access-control-max-age", b"86400"),
+                    (b"strict-transport-security", b"max-age=63072000"),
+                    (b"vary", b"Origin"),
+                    (b"cf-cache-status", b"DYNAMIC"),
+                ]
+                await send({
+                    "type": "http.response.start",
+                    "status": 204,
+                    "headers": headers,
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": b"",
+                })
+                return
+            
+            # For non-OPTIONS requests, read the request body
+            body_bytes = b""
+            more_body = True
+            first_message = True
+            max_iterations = 10  # Safety limit to prevent infinite loops
+            iteration = 0
+            
+            # Get expected Content-Length
+            content_length = 0
+            for k, v in scope.get("headers", []):
+                if k.lower() == b"content-length":
+                    try:
+                        content_length = int(v)
+                    except (ValueError, TypeError):
+                        pass
+                    break
+            
+            while more_body and iteration < max_iterations:
+                iteration += 1
+                try:
+                    # Use asyncio.wait_for to prevent hanging on receive()
+                    message = await asyncio.wait_for(receive(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout waiting for request body, proceeding with available data")
+                    break
+                
+                body_bytes += message.get("body", b"")
+                more_body = message.get("more_body", False)
+                
+                # Check if we've received all data according to Content-Length
+                if content_length > 0 and len(body_bytes) >= content_length:
+                    logger.info(f"Received expected Content-Length ({content_length} bytes), breaking early")
+                    more_body = False
+                
+                # For POST requests, we should receive the body in the first message
+                # If we get an empty body on the first message with no Content-Length, there might be no body
+                if first_message and not body_bytes and content_length == 0:
+                    more_body = False
+                
+                first_message = False
+            
+            if iteration >= max_iterations:
+                logger.warning(f"Reached max iterations ({max_iterations}) reading request body")
+            
+            # Log body info
+            if body_bytes:
+                logger.info(f"Received {len(body_bytes)} bytes, Content-Length was: {content_length}")
+            else:
+                logger.info("Received empty body, Content-Length was: {content_length}")
+            
+            logger.info(f"Received body bytes: {body_bytes[:200]}")
+            
+            # Generate Mcp-Session-Id for regular requests
+            session_id = generate_session_id()
+            
+            try:
+                body = json.loads(body_bytes.decode("utf-8"))
+                
+                logger.info(f"Parsed JSON body: {body}")
+                
+                # Check if this is an envelope format
+                extracted = handle_envelope_envelope(body, body_bytes)
+                
+                if extracted is not None:
+                    logger.info(f"Extracted JSON-RPC from Llama.cpp envelope")
+                    logger.info(f"Extracted JSON-RPC: {extracted}")
+                    
+                    # Use the extracted JSON-RPC as the body
+                    final_body_bytes = json.dumps(extracted).encode("utf-8")
+                    logger.info(f"Final body bytes (extracted): {final_body_bytes}")
+                else:
+                    logger.info("No envelope format detected, using original body")
+                    final_body_bytes = body_bytes
+            except json.JSONDecodeError as e:
+                # Not valid JSON, use original body
+                logger.warning(f"Failed to parse JSON: {e}")
+                final_body_bytes = body_bytes
+            
+            # Update Content-Length header to match final body size
+            # Remove existing Content-Length and Transfer-Encoding headers
+            new_headers = [
+                (k, v) for k, v in scope["headers"]
+                if k.lower() not in [b"content-length", b"transfer-encoding"]
+            ]
+            new_headers.append((b"content-length", str(len(final_body_bytes)).encode()))
+            scope["headers"] = new_headers
+            
+            # Create a new receive function with the final body
+            async def new_receive():
+                return {
+                    "type": "http.request",
+                    "body": final_body_bytes,
+                    "more_body": False
+                }
+            
+            # Create a wrapper for send to add session ID header to responses
+            original_send = send
+            session_added = [False]  # Use list to allow mutation in nested function
+            
+            async def wrapped_send(message):
+                if message["type"] == "http.response.start" and not session_added[0]:
+                    # Add Mcp-Session-Id header to the response (only once)
+                    headers = list(message.get("headers", []))
+                    headers.append((b"mcp-session-id", session_id.encode()))
+                    message = {**message, "headers": headers}
+                    session_added[0] = True
+                
+                await original_send(message)
+            
+            logger.info(f"Calling app with modified scope and receive")
+            # Call the original app with the new receive and send
+            try:
+                await self.app(scope, new_receive, wrapped_send)
+                logger.info(f"App completed successfully")
+            except Exception as e:
+                logger.error(f"Error in middleware: {e}", exc_info=True)
+                # Send error response if something goes wrong
+                # Note: If session was already added, this won't add another one
+                await wrapped_send({
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [[b"content-type", b"application/json"]],
+                })
+                await wrapped_send({
+                    "type": "http.response.body",
+                    "body": b'{"error": "Internal server error"}',
+                })
+        else:
+            await self.app(scope, receive, send) 
 
 # Store YouTube client for reuse
 _youtube_client: Optional[YouTubeClient] = None
