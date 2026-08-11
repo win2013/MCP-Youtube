@@ -39,6 +39,106 @@ All 33 tests are passing:
 - Note: The MCP SDK 2.0+ (`mcp>=2.0.0`) is recommended for new implementations
 - Current implementation uses fastmcp which wraps the MCP SDK
 
+## Thumbnail Processing Functionality
+
+### Overview
+Added comprehensive thumbnail processing capabilities to retrieve and convert YouTube video thumbnails in various formats, specifically designed for LLM image processing.
+
+### New Features
+
+#### 1. PNG Format Conversion
+- **Method**: `get_video_thumbnail_as_png(video_id, thumbnail_type="high")`
+- **Purpose**: Converts YouTube thumbnails to PNG format for LLM image processing
+- **Use Case**: All videos from TechedTV and similar sources include thumbnail images that can be directly displayed in LLMs
+
+#### 2. Flexible Format Selection
+- **Method**: `get_video_thumbnail(video_id, thumbnail_type="high", return_format="bytes")`
+- **Formats Supported**:
+  - `bytes`: Raw image bytes (default)
+  - `url`: Thumbnail URL string
+  - `base64`: Base64 encoded image string
+  - `png`: PNG format image bytes (via `get_video_thumbnail_as_png`)
+
+#### 3. MCP Tools Added
+
+##### `get_video_thumbnail_as_png`
+Retrieves video thumbnail as PNG image bytes for LLM processing.
+
+**Parameters**:
+- `video_id`: YouTube video ID or URL
+- `thumbnail_type`: Thumbnail resolution ('default', 'medium', 'high', 'standard', 'maxres')
+
+**Returns**: PNG format image bytes or error dictionary
+
+##### `get_video_thumbnail_url`
+Retrieves video thumbnail as URL string.
+
+**Parameters**:
+- `video_id`: YouTube video ID or URL
+- `thumbnail_type`: Thumbnail resolution ('default', 'medium', 'high', 'standard', 'maxres')
+
+**Returns**: Thumbnail URL string or error dictionary
+
+##### `get_video_details` (Enhanced)
+Added `include_thumbnail` parameter to include thumbnail in video details:
+- `url`: Thumbnail URL (default)
+- `bytes`: Image bytes (placeholder in JSON)
+- `base64`: Base64 encoded image
+- `none`: No thumbnail included
+
+### Implementation Details
+
+#### YouTubeClient Enhancements
+1. **`convert_to_png(image_data)`**: Converts any image format to PNG using PIL/Pillow
+2. **`get_video_thumbnail_as_png(video_id, thumbnail_type)`**: Gets thumbnail and converts to PNG
+3. **`get_video_thumbnail(video_id, thumbnail_type, return_format)`**: Flexible format selection
+4. **`get_thumbnail_image(thumbnail_url, save_path)`**: Enhanced to support various return formats
+
+#### Error Handling
+- Graceful handling of missing thumbnails
+- Support for videos without thumbnail images (returns URL fallback)
+- PIL/Pillow dependency detection with informative error messages
+- Network error handling with descriptive messages
+
+### Usage Examples
+
+#### Get Thumbnail as PNG for LLM
+```python
+from mcp_youtube.youtube_client import YouTubeClient
+
+client = YouTubeClient(api_key="YOUR_API_KEY")
+png_bytes = await client.get_video_thumbnail_as_png("dQw4w9WgXcQ")
+# png_bytes can be directly used with LLMs supporting image input
+```
+
+#### Get Thumbnail as URL
+```python
+url = await client.get_video_thumbnail_url("dQw4w9WgXcQ", thumbnail_type="high")
+# Returns: "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+```
+
+#### Get Thumbnail with Custom Format
+```python
+# Base64 format for embedding in JSON
+base64_image = await client.get_video_thumbnail("dQw4w9WgXcQ", return_format="base64")
+
+# URL format for linking
+url = await client.get_video_thumbnail("dQw4w9WgXcQ", return_format="url")
+
+# Default bytes format
+image_bytes = await client.get_video_thumbnail("dQw4w9WgXcQ")
+```
+
+### Testing
+All tests pass (36 passed, 1 skipped):
+- 4 tests for PNG thumbnail conversion
+- 4 tests for thumbnail format selection
+- All existing tests continue to pass
+
+### Dependencies
+- **PIL/Pillow**: Required for PNG conversion (`pip install Pillow`)
+- Gracefully handles missing PIL with informative error message
+
 ## Documentation Updates
 
 ### curl Commands

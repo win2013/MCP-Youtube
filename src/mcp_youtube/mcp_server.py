@@ -8,7 +8,7 @@ import secrets
 import logging
 import subprocess
 import sys
-from typing import Optional, Any
+from typing import Optional, Any, Union
 from dotenv import load_dotenv
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -131,18 +131,91 @@ def get_youtube_client() -> YouTubeClient:
 
 
 @mcp.tool()
-async def get_video_details(video_id: str) -> dict:
+async def get_video_thumbnail_as_png(video_id: str, 
+                                    thumbnail_type: str = "high") -> Union[dict, bytes]:
+    """Get a YouTube video thumbnail as PNG image bytes for LLM processing.
+    
+    This tool is specifically designed for videos that include thumbnail images
+    (like TechedTV videos) and returns the image in PNG format that can be
+    directly processed by LLMs.
+    
+    Args:
+        video_id: YouTube video ID or URL
+        thumbnail_type: Type of thumbnail to use ('default', 'medium', 'high', 'standard', 'maxres')
+                       Default is 'high' resolution.
+    
+    Returns:
+        PNG format image bytes if successful, or an error dictionary.
+        For non-image videos, returns the thumbnail URL as a string.
+    """
+    client = get_youtube_client()
+    video_id_clean = client.extract_video_id(video_id) or video_id
+    return await client.get_video_thumbnail_as_png(video_id_clean, thumbnail_type)
+
+
+@mcp.tool()
+async def get_video_thumbnail_url(video_id: str,
+                                 thumbnail_type: str = "high") -> Union[dict, str]:
+    """Get a YouTube video thumbnail URL.
+    
+    This tool returns the thumbnail as a URL string, which can be useful
+    when you need a link to the image rather than the image data itself.
+    
+    Args:
+        video_id: YouTube video ID or URL
+        thumbnail_type: Type of thumbnail to use ('default', 'medium', 'high', 'standard', 'maxres')
+                       Default is 'high' resolution.
+    
+    Returns:
+        Thumbnail URL string if successful, or an error dictionary.
+    """
+    client = get_youtube_client()
+    video_id_clean = client.extract_video_id(video_id) or video_id
+    return await client.get_video_thumbnail(video_id_clean, thumbnail_type, 
+                                           return_format="url")
+
+
+@mcp.tool()
+async def get_video_details(video_id: str, 
+                           include_thumbnail: str = "url") -> dict:
     """Get detailed information about a YouTube video
     
     Args:
         video_id: YouTube video ID or URL
-        
+        include_thumbnail: Format to include thumbnail ('url', 'bytes', 'base64', 'none')
+                         Default is 'url' for backward compatibility.
+    
     Returns:
         Dictionary containigng video details
     """
     client = get_youtube_client()
     video_id_clean = client.extract_video_id(video_id) or video_id
-    return await client.get_video_details(video_id_clean)
+    video_details = await client.get_video_details(video_id_clean)
+    
+    # Add thumbnail based on requested format
+    if include_thumbnail != "none" and "error" not in video_details:
+        video_id = video_details.get("video_id", video_id_clean)
+        thumbnail_type = "high"  # Default to high quality
+        
+        if include_thumbnail == "url":
+            # Already included in video details
+            pass
+        elif include_thumbnail in ("bytes", "base64"):
+            # Get the thumbnail image
+            thumbnail_data = await client.get_video_thumbnail(
+                video_id, thumbnail_type, 
+                return_format=include_thumbnail
+            )
+            
+            if isinstance(thumbnail_data, dict) and "error" in thumbnail_data:
+                video_details[f"thumbnail_{include_thumbnail}_error"] = thumbnail_data["error"]
+            elif include_thumbnail == "bytes":
+                # For bytes, we'll include a placeholder since bytes aren't JSON serializable
+                video_details["thumbnail_bytes"] = f"<{len(thumbnail_data)} bytes of image data>"
+            elif include_thumbnail == "base64":
+                video_details["thumbnail_base64"] = thumbnail_data
+    
+    return video_details
 
 
 @mcp.tool()

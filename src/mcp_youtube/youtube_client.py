@@ -267,17 +267,21 @@ class YouTubeClient:
             return {"success": False, "error": f"Failed to save image: {str(e)}"}
     
     async def get_video_thumbnail(self, video_id: str, thumbnail_type: str = "high", 
-                                 save_path: Optional[str] = None) -> Union[Dict, bytes]:
+                                 save_path: Optional[str] = None,
+                                 return_format: str = "bytes") -> Union[Dict, bytes, str]:
         """Get and optionally save a thumbnail for a YouTube video
         
         Args:
             video_id: YouTube video ID
             thumbnail_type: Type of thumbnail ('default', 'medium', 'high', 'standard', 'maxres')
             save_path: Optional path to save the image file
+            return_format: Format to return ('bytes', 'url', 'base64')
         
         Returns:
             If save_path provided: Dictionary with filename, path, and size
-            If no save_path: Image bytes
+            If return_format='bytes': Image bytes
+            If return_format='url': Thumbnail URL string
+            If return_format='base64': Base64 encoded image string
         """
         # First get video details to find the thumbnail URL
         video_details = await self.get_video_details(video_id)
@@ -298,8 +302,92 @@ class YouTubeClient:
         if not thumbnail_url:
             return {"error": f"No {thumbnail_type} thumbnail available"}
         
-        # Download the image
-        return self.get_thumbnail_image(thumbnail_url, save_path)
+        # Return URL if requested
+        if return_format == "url":
+            return thumbnail_url
+        
+        # Download the image and return based on format
+        image_data = self.get_thumbnail_image(thumbnail_url, save_path)
+        
+        # If download failed, return error
+        if isinstance(image_data, dict) and not image_data.get("success", True):
+            return image_data
+        
+        # If save_path was provided, return info dict
+        if save_path:
+            return image_data
+        
+        # Handle different return formats
+        if return_format == "bytes":
+            return image_data if isinstance(image_data, bytes) else image_data.get("data", image_data)
+        elif return_format == "base64":
+            try:
+                import base64
+                if isinstance(image_data, bytes):
+                    return base64.b64encode(image_data).decode('utf-8')
+                elif isinstance(image_data, dict) and "path" in image_data:
+                    # Read from file if saved
+                    with open(image_data["path"], "rb") as f:
+                        return base64.b64encode(f.read()).decode('utf-8')
+            except Exception as e:
+                return {"error": f"Failed to encode image to base64: {str(e)}"}
+        
+        return image_data
+    
+    def convert_to_png(self, image_data: bytes) -> Union[Dict, bytes]:
+        """Convert image data to PNG format
+        
+        Args:
+            image_data: Raw image bytes in any format
+        
+        Returns:
+            PNG format image bytes, or error dict if conversion fails
+        """
+        try:
+            from PIL import Image
+            import io
+            
+            # Open image from bytes
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Convert to RGB if necessary (for formats that don't support transparency)
+            if image.mode in ('RGBA', 'P'):
+                image = image.convert('RGB')
+            
+            # Save as PNG to bytes buffer
+            png_buffer = io.BytesIO()
+            image.save(png_buffer, format='PNG')
+            
+            return png_buffer.getvalue()
+            
+        except ImportError:
+            return {"error": "PIL/Pillow is required for image conversion. Install with: pip install Pillow"}
+        except Exception as e:
+            return {"error": f"Failed to convert image to PNG: {str(e)}"}
+    
+    async def get_video_thumbnail_as_png(self, video_id: str, 
+                                        thumbnail_type: str = "high") -> Union[Dict, bytes]:
+        """Get thumbnail as PNG format for LLM image processing
+        
+        Args:
+            video_id: YouTube video ID
+            thumbnail_type: Type of thumbnail to use ('default', 'medium', 'high', 'standard', 'maxres')
+        
+        Returns:
+            PNG format image bytes, or error dict
+        """
+        # Get thumbnail in original format
+        thumbnail_data = await self.get_video_thumbnail(video_id, thumbnail_type, 
+                                                        return_format="bytes")
+        
+        if isinstance(thumbnail_data, dict) and "error" in thumbnail_data:
+            return thumbnail_data
+        
+        if not isinstance(thumbnail_data, bytes):
+            return {"error": "Failed to retrieve thumbnail image"}
+        
+        # Convert to PNG
+        return self.convert_to_png(thumbnail_data)
 
 
 async def _run_client(args: argparse.Namespace) -> None:

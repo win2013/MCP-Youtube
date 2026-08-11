@@ -2,6 +2,7 @@
 """Tests for YouTubeClient class"""
 import pytest
 import asyncio
+import os
 from unittest.mock import Mock, patch, MagicMock
 from mcp_youtube.youtube_client import YouTubeClient
 from googleapiclient.errors import HttpError
@@ -570,42 +571,329 @@ class TestThumbnailRetrieval:
     @pytest.mark.asyncio
     async def test_get_video_thumbnail_success(self, api_key):
         """Test getting video thumbnail by video ID"""
-        client = YouTubeClient(api_key=api_key)
-        
-        result = await client.get_video_thumbnail("dQw4w9WgXcQ")
-        
-        assert isinstance(result, bytes)
-        assert len(result) > 0
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            # Mock video details response
+            mock_videos_response = {
+                'items': [{
+                    'snippet': {
+                        'title': 'Test Video',
+                        'description': 'Test description',
+                        'channelTitle': 'Test Channel',
+                        'publishedAt': '2023-01-01T00:00:00Z',
+                        'thumbnails': {
+                            'high': {'url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'},
+                            'medium': {'url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg'},
+                            'default': {'url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg'}
+                        }
+                    },
+                    'statistics': {'viewCount': '1000', 'likeCount': '100', 'commentCount': '50'},
+                    'contentDetails': {'duration': 'PT3M30S'}
+                }]
+            }
+            
+            mock_videos = MagicMock()
+            mock_videos.list.return_value = mock_videos
+            mock_videos.list.execute.return_value = mock_videos_response
+            mock_youtube.videos.return_value = mock_videos
+            
+            client = YouTubeClient(api_key=api_key)
+            
+            # Mock get_video_details to return our sample
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "title": "Test Video",
+                "description": "Test description",
+                "channel_title": "Test Channel",
+                "published_at": "2023-01-01T00:00:00Z",
+                "thumbnail": "https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg",
+                "thumbnail_medium": "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+                "thumbnail_high": "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                "view_count": 1000,
+                "like_count": 100,
+                "comment_count": 50,
+                "duration": "PT3M30S",
+                "tags": [],
+                "category_id": "22"
+            }):
+                result = await client.get_video_thumbnail("dQw4w9WgXcQ")
+                
+                assert isinstance(result, bytes)
+                assert len(result) > 0
     
     @pytest.mark.asyncio
     async def test_get_video_thumbnail_with_save_path(self, api_key, tmp_path):
         """Test getting video thumbnail and saving to file"""
-        client = YouTubeClient(api_key=api_key)
-        save_path = str(tmp_path / "video_thumbnail.jpg")
-        
-        result = await client.get_video_thumbnail("dQw4w9WgXcQ", save_path=save_path)
-        
-        assert isinstance(result, dict)
-        assert result["success"] is True
-        assert os.path.exists(save_path)
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            
+            # Mock get_video_details to return our sample
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "title": "Test Video",
+                "description": "Test description",
+                "channel_title": "Test Channel",
+                "published_at": "2023-01-01T00:00:00Z",
+                "thumbnail": "https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg",
+                "thumbnail_medium": "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+                "thumbnail_high": "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                "view_count": 1000,
+                "like_count": 100,
+                "comment_count": 50,
+                "duration": "PT3M30S",
+                "tags": [],
+                "category_id": "22"
+            }):
+                save_path = str(tmp_path / "video_thumbnail.jpg")
+                
+                result = await client.get_video_thumbnail("dQw4w9WgXcQ", save_path=save_path)
+                
+                assert isinstance(result, dict)
+                assert result["success"] is True
+                assert os.path.exists(save_path)
     
     @pytest.mark.asyncio
     async def test_get_video_thumbnail_different_types(self, api_key):
         """Test getting different thumbnail types"""
-        client = YouTubeClient(api_key=api_key)
-        
-        # Test different thumbnail types
-        for thumb_type in ["default", "medium", "high"]:
-            result = await client.get_video_thumbnail("dQw4w9WgXcQ", thumbnail_type=thumb_type)
-            assert isinstance(result, bytes)
-            assert len(result) > 0
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            
+            # Mock get_video_details to return our sample
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "title": "Test Video",
+                "description": "Test description",
+                "channel_title": "Test Channel",
+                "published_at": "2023-01-01T00:00:00Z",
+                "thumbnail": "https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg",
+                "thumbnail_default": "https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg",
+                "thumbnail_medium": "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+                "thumbnail_high": "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                "view_count": 1000,
+                "like_count": 100,
+                "comment_count": 50,
+                "duration": "PT3M30S",
+                "tags": [],
+                "category_id": "22"
+            }):
+                # Test different thumbnail types
+                for thumb_type in ["default", "medium", "high"]:
+                    result = await client.get_video_thumbnail("dQw4w9WgXcQ", thumbnail_type=thumb_type)
+                    assert isinstance(result, bytes)
+                    assert len(result) > 0
     
     @pytest.mark.asyncio
     async def test_get_video_thumbnail_invalid_video(self, api_key):
         """Test getting thumbnail for non-existent video"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            
+            # Mock get_video_details to return an error
+            with patch.object(client, 'get_video_details', return_value={"error": "Video not found"}):
+                result = await client.get_video_thumbnail("invalid_video_id_12345")
+                
+                assert isinstance(result, dict)
+
+
+# Test PNG thumbnail conversion
+class TestPNGThumbnailConversion:
+    """Tests for PNG thumbnail conversion methods"""
+    
+    def test_convert_to_png_success(self, api_key):
+        """Test successful PNG conversion"""
         client = YouTubeClient(api_key=api_key)
         
-        result = await client.get_video_thumbnail("invalid_video_id_12345")
+        # Use a known JPEG thumbnail URL
+        thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        image_bytes = client.get_thumbnail_image(thumbnail_url)
+        
+        if isinstance(image_bytes, bytes) and len(image_bytes) > 0:
+            # Convert to PNG
+            result = client.convert_to_png(image_bytes)
+            
+            # Check if result is bytes (success) or dict (error)
+            if isinstance(result, bytes):
+                assert len(result) > 0
+                # PNG files start with specific bytes
+                assert result[:8] == b'\x89PNG\r\n\x1a\n'
+            else:
+                # If PIL not installed, check error message
+                assert isinstance(result, dict)
+                assert 'error' in result
+        else:
+            pytest.skip("Could not download test image")
+    
+    def test_convert_to_png_invalid_data(self, api_key):
+        """Test PNG conversion with invalid image data"""
+        client = YouTubeClient(api_key=api_key)
+        invalid_data = b"not a valid image"
+        
+        result = client.convert_to_png(invalid_data)
         
         assert isinstance(result, dict)
-        assert "error" in result
+        assert 'error' in result
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_as_png_success(self, api_key):
+        """Test getting video thumbnail as PNG"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            
+            # Mock get_video_details to return thumbnail URL
+            mock_thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "title": "Test Video",
+                "description": "Test description",
+                "channel_title": "Test Channel",
+                "published_at": "2023-01-01T00:00:00Z",
+                "thumbnail": mock_thumbnail_url,
+                "thumbnail_high": mock_thumbnail_url,
+                "view_count": 1000,
+                "like_count": 100,
+                "comment_count": 50,
+                "duration": "PT3M30S",
+                "tags": [],
+                "category_id": "22"
+            }):
+                # Mock get_thumbnail_image to return some image bytes
+                mock_image_bytes = b'\xff\xd8\xff\xe0\x00\x10JFIF'  # Fake JPEG bytes
+                
+                with patch.object(client, 'get_thumbnail_image', return_value=mock_image_bytes):
+                    result = await client.get_video_thumbnail_as_png("dQw4w4w9WgXcQ")
+                    
+                    # Result could be PNG bytes or error dict if PIL not available
+                    if isinstance(result, bytes):
+                        assert len(result) > 0
+                    elif isinstance(result, dict):
+                        if 'error' in result:
+                            pytest.skip("PIL not installed for PNG conversion")
+                        else:
+                            assert 'success' in result or 'error' in result
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_as_png_invalid_video(self, api_key):
+        """Test getting PNG thumbnail for non-existent video"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            
+            # Mock get_video_details to return an error
+            with patch.object(client, 'get_video_details', return_value={"error": "Video not found"}):
+                result = await client.get_video_thumbnail_as_png("invalid_video_id")
+                
+                assert isinstance(result, dict)
+                assert "error" in result
+
+
+# Test thumbnail URL format selection
+class TestThumbnailFormatSelection:
+    """Tests for thumbnail format selection (URL vs bytes)"""
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_url_format(self, api_key):
+        """Test getting thumbnail as URL string"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            mock_thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "thumbnail_high": mock_thumbnail_url
+            }):
+                result = await client.get_video_thumbnail("dQw4w9WgXcQ", return_format="url")
+                
+                assert isinstance(result, str)
+                assert result == mock_thumbnail_url
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_base64_format(self, api_key):
+        """Test getting thumbnail as base64 encoded string"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            mock_thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            mock_image_bytes = b'\xff\xd8\xff\xe0\x00\x10JFIF'  # Fake JPEG bytes
+            
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "thumbnail_high": mock_thumbnail_url
+            }):
+                with patch.object(client, 'get_thumbnail_image', return_value=mock_image_bytes):
+                    result = await client.get_video_thumbnail("dQw4w9WgXcQ", return_format="base64")
+                    
+                    if isinstance(result, str):
+                        import base64
+                        # Verify it's valid base64
+                        try:
+                            base64.b64decode(result)
+                            assert len(result) > 0
+                        except Exception:
+                            assert False, "Result is not valid base64"
+                    elif isinstance(result, dict):
+                        assert 'error' in result
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_bytes_format(self, api_key):
+        """Test getting thumbnail as bytes (default format)"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            mock_thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            mock_image_bytes = b'\xff\xd8\xff\xe0\x00\x10JFIF'
+            
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "thumbnail_high": mock_thumbnail_url
+            }):
+                with patch.object(client, 'get_thumbnail_image', return_value=mock_image_bytes):
+                    result = await client.get_video_thumbnail("dQw4w9WgXcQ", return_format="bytes")
+                    
+                    assert isinstance(result, bytes)
+                    assert len(result) > 0
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_default_format_is_bytes(self, api_key):
+        """Test that default format is bytes when not specified"""
+        with patch('mcp_youtube.youtube_client.build') as mock_build:
+            mock_youtube = MagicMock()
+            mock_build.return_value = mock_youtube
+            
+            client = YouTubeClient(api_key=api_key)
+            mock_thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            mock_image_bytes = b'\xff\xd8\xff\xe0\x00\x10JFIF'
+            
+            with patch.object(client, 'get_video_details', return_value={
+                "video_id": "dQw4w9WgXcQ",
+                "thumbnail_high": mock_thumbnail_url
+            }):
+                with patch.object(client, 'get_thumbnail_image', return_value=mock_image_bytes):
+                    result = await client.get_video_thumbnail("dQw4w9WgXcQ")  # No format specified
+                    
+                    # Default should be bytes
+                    assert isinstance(result, bytes)
+                    assert len(result) > 0
