@@ -9,6 +9,7 @@ fastapi>=0.110.0
 uvicorn>=0.27.0
 fastmcp>=3.4.0,<4.0.0
 mcp>=1.29.0
+requests>=2.31.0
 
 # Testing requirements
 pytest>=7.0.0

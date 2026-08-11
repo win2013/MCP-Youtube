@@ -523,3 +523,89 @@ class TestSearchVideos:
             result = await client.search_videos("nonexistent query")
             
             assert len(result) == 0
+
+
+# Test thumbnail image retrieval methods
+class TestThumbnailRetrieval:
+    """Tests for thumbnail image retrieval methods"""
+    
+    def test_get_thumbnail_image_success(self, api_key):
+        """Test successful thumbnail image download"""
+        client = YouTubeClient(api_key=api_key)
+        # Use a known thumbnail URL
+        thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        
+        result = client.get_thumbnail_image(thumbnail_url)
+        
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+    
+    def test_get_thumbnail_image_with_save_path(self, api_key, tmp_path):
+        """Test thumbnail image download with saving to file"""
+        client = YouTubeClient(api_key=api_key)
+        thumbnail_url = "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        save_path = str(tmp_path / "thumbnail.jpg")
+        
+        result = client.get_thumbnail_image(thumbnail_url, save_path)
+        
+        assert isinstance(result, dict)
+        assert result["success"] is True
+        assert "path" in result
+        assert "filename" in result
+        assert "size_bytes" in result
+        # Verify file was actually created
+        assert os.path.exists(save_path)
+    
+    def test_get_thumbnail_image_invalid_url(self, api_key):
+        """Test thumbnail download with invalid URL"""
+        client = YouTubeClient(api_key=api_key)
+        invalid_url = "https://invalid-url.com/nonexistent.jpg"
+        
+        result = client.get_thumbnail_image(invalid_url)
+        
+        assert isinstance(result, dict)
+        assert result["success"] is False
+        assert "error" in result
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_success(self, api_key):
+        """Test getting video thumbnail by video ID"""
+        client = YouTubeClient(api_key=api_key)
+        
+        result = await client.get_video_thumbnail("dQw4w9WgXcQ")
+        
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_with_save_path(self, api_key, tmp_path):
+        """Test getting video thumbnail and saving to file"""
+        client = YouTubeClient(api_key=api_key)
+        save_path = str(tmp_path / "video_thumbnail.jpg")
+        
+        result = await client.get_video_thumbnail("dQw4w9WgXcQ", save_path=save_path)
+        
+        assert isinstance(result, dict)
+        assert result["success"] is True
+        assert os.path.exists(save_path)
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_different_types(self, api_key):
+        """Test getting different thumbnail types"""
+        client = YouTubeClient(api_key=api_key)
+        
+        # Test different thumbnail types
+        for thumb_type in ["default", "medium", "high"]:
+            result = await client.get_video_thumbnail("dQw4w9WgXcQ", thumbnail_type=thumb_type)
+            assert isinstance(result, bytes)
+            assert len(result) > 0
+    
+    @pytest.mark.asyncio
+    async def test_get_video_thumbnail_invalid_video(self, api_key):
+        """Test getting thumbnail for non-existent video"""
+        client = YouTubeClient(api_key=api_key)
+        
+        result = await client.get_video_thumbnail("invalid_video_id_12345")
+        
+        assert isinstance(result, dict)
+        assert "error" in result

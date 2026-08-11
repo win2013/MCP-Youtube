@@ -7,7 +7,9 @@ import json
 import importlib
 import os
 import re
-from typing import Dict, List, Optional
+import requests
+from typing import Dict, List, Optional, Union
+from pathlib import Path
 
 try:
     from googleapiclient.discovery import build  # type: ignore
@@ -212,6 +214,92 @@ class YouTubeClient:
         """Close HTTP client"""
         # No persistent async HTTP client is used by googleapiclient; nothing to close.
         return None
+    
+    def get_thumbnail_image(self, thumbnail_url: str, save_path: Optional[str] = None) -> Union[Dict, bytes]:
+        """Download a thumbnail image from a URL
+        
+        Args:
+            thumbnail_url: URL of the thumbnail image
+            save_path: Optional path to save the image file. If provided, returns dict with info.
+                      If None, returns image bytes.
+        
+        Returns:
+            If save_path provided: Dictionary with filename, path, and size
+            If no save_path: Image bytes
+        """
+        try:
+            response = requests.get(thumbnail_url, timeout=10)
+            response.raise_for_status()
+            
+            if save_path:
+                # Create directory if it doesn't exist
+                path = Path(save_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Generate filename from URL if not provided
+                if path.suffix == '':
+                    # Extract extension from URL
+                    url_parts = thumbnail_url.split('.')
+                    if len(url_parts) > 1:
+                        ext = '.' + url_parts[-1].split('?')[0]  # Remove query params
+                        path = path.with_suffix(ext)
+                    else:
+                        path = path.with_suffix('.jpg')
+                
+                # Save the image
+                with open(path, 'wb') as f:
+                    f.write(response.content)
+                
+                return {
+                    "success": True,
+                    "filename": path.name,
+                    "path": str(path),
+                    "size_bytes": len(response.content),
+                    "url": thumbnail_url
+                }
+            else:
+                # Return image bytes
+                return response.content
+                
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Failed to download image: {str(e)}"}
+        except IOError as e:
+            return {"success": False, "error": f"Failed to save image: {str(e)}"}
+    
+    async def get_video_thumbnail(self, video_id: str, thumbnail_type: str = "high", 
+                                 save_path: Optional[str] = None) -> Union[Dict, bytes]:
+        """Get and optionally save a thumbnail for a YouTube video
+        
+        Args:
+            video_id: YouTube video ID
+            thumbnail_type: Type of thumbnail ('default', 'medium', 'high', 'standard', 'maxres')
+            save_path: Optional path to save the image file
+        
+        Returns:
+            If save_path provided: Dictionary with filename, path, and size
+            If no save_path: Image bytes
+        """
+        # First get video details to find the thumbnail URL
+        video_details = await self.get_video_details(video_id)
+        
+        if "error" in video_details:
+            return video_details
+        
+        # Map thumbnail type to the appropriate field
+        thumbnail_field = f"thumbnail_{thumbnail_type}"
+        if thumbnail_type == "maxres":
+            thumbnail_field = "thumbnail_maxres"
+            # maxres might not be in the default response, so we need to handle it
+            if thumbnail_field not in video_details:
+                return {"error": "Max resolution thumbnail not available"}
+        
+        thumbnail_url = video_details.get(thumbnail_field)
+        
+        if not thumbnail_url:
+            return {"error": f"No {thumbnail_type} thumbnail available"}
+        
+        # Download the image
+        return self.get_thumbnail_image(thumbnail_url, save_path)
 
 
 async def _run_client(args: argparse.Namespace) -> None:

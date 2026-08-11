@@ -7,13 +7,15 @@
       "accept": "application/json, text/event-stream",
       "authorization": "Bearer: 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",
       "content-type": "application/json"
-    },
-    "body": {
+           }
+  },
+  "body" : 
+    {
       "kind": "string",
-      "size": 189
-    },
-    "jsonRpcMethods": [
-      "initialize"
-    ]
-  }
+      "size": 189,
+     "jsonRpcMethods": [
+         "initialize"
+      ]
+    }
 }
+  
